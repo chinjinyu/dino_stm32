@@ -1,0 +1,5 @@
+target("board")
+    set_kind("object")
+    add_files("**.c")
+    add_includedirs(".", {public = true})
+    add_deps("stm32g0xx")
