@@ -4,5 +4,7 @@
 #include <bsp/stdio.h>
 #include <bsp/time.h>
 
-void bsp_init(void);
+#include <bsp/oled.h>
+#include <bsp/key.h>
 
+void bsp_init(void);

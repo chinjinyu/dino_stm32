@@ -1,5 +1,5 @@
 -- 设置工程名
-set_project("stm32g030f6 projects")
+set_project("dino")
 -- 设置版本号
 set_version("1.0.0")
 -- 设置编程语言
