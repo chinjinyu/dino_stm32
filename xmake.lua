@@ -1,7 +1,7 @@
 -- 设置工程名
 set_project("stm32g030f6 projects")
 -- 设置版本号
-set_version("1.0.0")
+set_version("1.0.1")
 -- 设置编程语言
 set_languages("gnu99", "gnuxx11")
 
