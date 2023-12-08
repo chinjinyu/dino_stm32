@@ -1,13 +1,13 @@
 -- 设置工程名
 set_project("stm32g030f6 projects")
 -- 设置版本号
-set_version("1.0.1")
+set_version("1.0.2")
 -- 设置编程语言
 set_languages("gnu99", "gnuxx11")
 
 -- 定义交叉编译工具链
 toolchain("arm-none-eabi-gcc")
-    local sdkdir = "$(env HOME)/tools/xpack-arm-none-eabi-gcc-12.3.1-1.1"
+    local sdkdir = "$(env HOME)/tools/xpack-arm-none-eabi-gcc-13.2.1-1.1"
     local includedir = path.join(sdkdir, "arm-none-eabi", "include")
 
     set_kind("standalone")
@@ -41,22 +41,24 @@ local mcu_flags = {
 
 -- 添加C/C++编译选项
 add_cxflags(
-    table.unpack(mcu_flags),
+    mcu_flags,
     "-fdata-sections",
-    "-ffunction-sections"
+    "-ffunction-sections",
+    {force = true}
 )
 
 -- 添加汇编选项
 add_asflags(
-    table.unpack(mcu_flags),
+    mcu_flags,
     "-x assembler-with-cpp",
     "-fdata-sections",
-    "-ffunction-sections"
+    "-ffunction-sections",
+    {force = true}
 )
 
 -- 添加链接选项
 add_ldflags(
-    table.unpack(mcu_flags),
+    mcu_flags,
     "-T" .. linkscript,
     "-Wl,--gc-sections",
     "-Wl,--no-warn-rwx-segments",
