@@ -20,6 +20,7 @@ target("stm32g0xx")
         "STM32G0xx_HAL_Driver/Inc",
         {public = true}
     )
+    add_cxflags("-Wno-unused-parameter")
     add_linkdirs("CMSIS/DSP/Lib/GCC")
     add_links("arm_cortexM0l_math")
 
