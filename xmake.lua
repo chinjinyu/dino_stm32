@@ -1,7 +1,7 @@
 -- 设置工程名
 set_project("stm32g030f6 projects")
 -- 设置版本号
-set_version("1.0.3")
+set_version("1.0.4")
 -- 设置编程语言
 set_languages("gnu99", "gnuxx11")
 
@@ -17,7 +17,7 @@ option("cortex-arch")
     set_values("cortex-m0", "cortex-m0plus", "cortex-m3", "cortex-m4", "cortex-m7", "cortex-m23", "cortex-m33")
     set_description("Cortex Architecture",
                     "    - cortex-m0",
-                    "    - cortex-m0+",
+                    "    - cortex-m0plus",
                     "    - cortex-m3",
                     "    - cortex-m4",
                     "    - cortex-m7",
@@ -75,13 +75,6 @@ option_end()
 option("mcu-part")
     set_default("STM32G030F6Px")
     set_description("MCU Part")
-    set_category("pyOCD")
-option_end()
-
--- DFP路径
-option("dfp-pack")
-    set_default(path.join("misc", "Keil.STM32G0xx_DFP.1.4.0.pack"))
-    set_description("DFP File")
     set_category("pyOCD")
 option_end()
 
@@ -213,7 +206,7 @@ task("program target")
             command = string.format("%s -f $(openocd-interface) -f $(openocd-target) -c \"%s\"", openocd, operation)
         elseif is_config("programmer", "pyOCD") then
             local pyocd = find_program("pyocd")
-            command = string.format("%s load --erase=auto --target=$(mcu-part) --pack=$(dfp-pack) %s", pyocd, target:targetfile())
+            command = string.format("%s load --erase=auto --target=$(mcu-part) %s", pyocd, target:targetfile())
         end
         
         print(string.format("use programmer \"%s\"", "$(programmer)"))
