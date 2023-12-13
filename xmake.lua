@@ -1,19 +1,89 @@
 -- 设置工程名
 set_project("dino")
 -- 设置版本号
-set_version("1.0.2")
+set_version("1.0.4")
 -- 设置编程语言
 set_languages("gnu99", "gnuxx11")
 
+-- 编译工具链路径
+option("gcc-dir")
+    set_default(path.join("$(env HOME)", "tools", "xpack-arm-none-eabi-gcc-13.2.1-1.1"))
+    set_description("GNU C Cross Compiler Toolchain")
+option_end()
+
+-- Cortex内核类型
+option("cortex-arch")
+    set_default("cortex-m0plus")
+    set_values("cortex-m0", "cortex-m0plus", "cortex-m3", "cortex-m4", "cortex-m7", "cortex-m23", "cortex-m33")
+    set_description("Cortex Architecture",
+                    "    - cortex-m0",
+                    "    - cortex-m0plus",
+                    "    - cortex-m3",
+                    "    - cortex-m4",
+                    "    - cortex-m7",
+                    "    - cortex-m23",
+                    "    - cortex-m33")
+    set_category("MCU")
+option_end()
+
+-- 启用FPU
+option("enable-fpu")
+    set_default(false)
+    set_description("Enable FPU")
+    set_category("MCU")
+option_end()
+
+-- FPU类型
+option("fpu-type")
+    set_default("none")
+    set_values("none", "fpv4-sp-d16", "fpv4-d16", "fpv5-sp-d16", "fpv5-d16")
+    set_description("FPU Type")
+    set_category("MCU")
+option_end()
+
+-- 链接脚本路径
+option("linkscript")
+    set_default(path.join("misc", "STM32G030F6PX_FLASH.ld"))
+    set_description("Linkscript")
+    set_category("MCU")
+option_end()
+
+-- 编程器类型
+option("programmer")
+    set_default("pyOCD")
+    set_values("OpenOCD", "pyOCD")
+    set_description("Programmer",
+                    "    - OpenOCD",
+                    "    - pyOCD")
+option_end()
+
+-- OpenOCD接口配置文件
+option("openocd-interface")
+    set_default(path.join("misc", "cmsis-dap.cfg"))
+    set_description("Interface Config File")
+    set_category("OpenOCD")
+option_end()
+
+-- OpenOCD目标配置文件
+option("openocd-target")
+    set_default(path.join("misc", "stm32g0x.cfg"))
+    set_description("Target Config File")
+    set_category("OpenOCD")
+option_end()
+
+-- MCU型号
+option("mcu-part")
+    set_default("STM32G030F6Px")
+    set_description("MCU Part")
+    set_category("pyOCD")
+option_end()
+
 -- 定义交叉编译工具链
 toolchain("arm-none-eabi-gcc")
-    local sdkdir = "$(env HOME)/tools/xpack-arm-none-eabi-gcc-13.2.1-1.1"
-    local includedir = path.join(sdkdir, "arm-none-eabi", "include")
-
     set_kind("standalone")
-    set_sdkdir(sdkdir)
+    set_sdkdir("$(gcc-dir)")
     -- 下面这行可以省略，这里主要是为了解决clangd无法找到系统头文件的问题
-    add_includedirs(includedir)
+    add_includedirs(path.join("$(gcc-dir)", "arm-none-eabi", "include"))
 toolchain_end()
 
 -- 设置默认编译工具和平台（可被命令行覆盖）
@@ -25,19 +95,19 @@ set_defaultmode("debug")
 -- 添加debug和release模式
 add_rules("mode.debug", "mode.release")
 
--- 链接脚本
-local linkscript = path.join("misc", "STM32G030F6PX_FLASH.ld")
--- OpenOCD配置文件
-local openocd_cfg = {
-    path.join("misc", "cmsis-dap.cfg"),
-    path.join("misc", "stm32g0x.cfg")
-}
 -- GCC中与MCU相关的选项
 local mcu_flags = {
-    "-mcpu=cortex-m0plus",
+    "-mcpu=$(cortex-arch)",
     "-mthumb",
-    "-mfloat-abi=soft"
 }
+if has_config("enable-fpu") then
+    table.insert(mcu_flags, "-mfloat-abi=hard")
+    if not is_config("fpu-type", "none") then
+        table.insert(mcu_flags, "-mfpu=$(fpu-type)")
+    end
+else
+    table.insert(mcu_flags, "-mfloat-abi=soft")
+end
 
 -- 添加C/C++编译选项
 add_cxflags(
@@ -59,7 +129,7 @@ add_asflags(
 -- 添加链接选项
 add_ldflags(
     mcu_flags,
-    "-T" .. linkscript,
+    "-T$(linkscript)",
     "-Wl,--gc-sections",
     "-Wl,--no-warn-rwx-segments",
     "-specs=nano.specs",
@@ -103,10 +173,12 @@ task("convert target")
         local bindir = toolchain:bindir()
         local prefix = toolchain:cross()
         local size = find_program(prefix .. "size", {paths = bindir})
-        local cp = find_program(prefix .. "objcopy", {paths = bindir})
-        local hex = cp .. " -O ihex"
-        local bin = cp .. " -O binary -S"
+        local copy = find_program(prefix .. "objcopy", {paths = bindir})
+        local dump = find_program(prefix .. "objdump", {paths = bindir})
+        local hex = copy .. " -O ihex"
+        local bin = copy .. " -O binary -S"
 
+        os.execv(dump, {"-h", "-S", target:targetfile()}, {stdout = path.join(target:targetdir(), target:basename() .. ".list")})
         os.exec("%s %s", size, target:targetfile())
         os.exec("%s %s %s", hex, target:targetfile(), path.join(target:targetdir(), target:basename() .. ".hex"))
         os.exec("%s %s %s", bin, target:targetfile(), path.join(target:targetdir(), target:basename() .. ".bin"))
@@ -118,6 +190,7 @@ task("clean target")
     on_run(function (target)
         os.rm(path.join(target:targetdir(), target:basename() .. ".hex"))
         os.rm(path.join(target:targetdir(), target:basename() .. ".bin"))
+        os.rm(path.join(target:targetdir(), target:basename() .. ".list"))
     end)
 task_end()
 
@@ -125,16 +198,19 @@ task_end()
 task("program target")
     on_run(function (target)
         import("lib.detect.find_program")
+        local command = nil
 
-        local openocd = find_program("openocd")
-        local command = string.format("program %s verify reset exit", target:targetfile())
-        local openocd_flags = ""
-
-        for _, v in ipairs(openocd_cfg) do
-            openocd_flags = openocd_flags .. string.format("-f %s ", v)
+        if is_config("programmer", "OpenOCD") then
+            local openocd = find_program("openocd")
+            local operation = string.format("program %s verify reset exit", target:targetfile())
+            command = string.format("%s -f $(openocd-interface) -f $(openocd-target) -c \"%s\"", openocd, operation)
+        elseif is_config("programmer", "pyOCD") then
+            local pyocd = find_program("pyocd")
+            command = string.format("%s load --erase=auto --target=$(mcu-part) %s", pyocd, target:targetfile())
         end
-        openocd_flags = openocd_flags .. string.format("-c \"%s\"", command)
-
-        os.exec("%s %s", openocd, openocd_flags)
+        
+        print(string.format("use programmer \"%s\"", "$(programmer)"))
+        print(command)
+        os.exec(command)
     end)
 task_end()
